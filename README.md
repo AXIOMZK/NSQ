@@ -9,7 +9,7 @@
 
 我们来看一下它的架构   
 
-![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/NSQ架构.png)   
+![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/NSQ.png)   
 
 
 
