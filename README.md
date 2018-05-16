@@ -7,5 +7,9 @@
 
 - ***nsqadmin*** 是一个 Web UI 来实时监控集群(和执行各种管理任务)。
 
-我们来看一下它的架构
+我们来看一下它的架构   
+
+![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/NSQ架构-6.pdf)   
+
+
 
