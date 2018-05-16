@@ -27,7 +27,7 @@ NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故�
 ![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/NSQ.png)  
 
 # NSQ详解
-[nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd.gif)
+![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd.gif)
 
 
 
