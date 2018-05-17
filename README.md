@@ -1,14 +1,22 @@
-
-<!--ts-->
-<!--te-->
-
 NSQ是一个基于Go语言的分布式实时消息平台，它基于MIT开源协议发布，由bitly公司开源出来的一款简单易用的消息中间件。   
 
 NSQ可用于大规模系统中的实时消息服务，并且每天能够处理数亿级别的消息，其设计目标是为在分布式环境下运行的去中心化服务提供一个强大的基础架构。   
 
 NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。   
 
-
+* [NSQ组件](#nsq%E7%BB%84%E4%BB%B6)
+* [NSQ架构](#nsq%E6%9E%B6%E6%9E%84)
+  * [<em><strong>topic</strong></em>  消息的逻辑关键词](#topic--%E6%B6%88%E6%81%AF%E7%9A%84%E9%80%BB%E8%BE%91%E5%85%B3%E9%94%AE%E8%AF%8D)
+  * [<em><strong>producer</strong></em>   消息的生产者/发布者](#producer---%E6%B6%88%E6%81%AF%E7%9A%84%E7%94%9F%E4%BA%A7%E8%80%85%E5%8F%91%E5%B8%83%E8%80%85)
+  * [<em><strong>channel</strong></em>  消息传递的通道](#channel--%E6%B6%88%E6%81%AF%E4%BC%A0%E9%80%92%E7%9A%84%E9%80%9A%E9%81%93)
+  * [<em><strong>consumer</strong></em>  消息的消费者](#consumer--%E6%B6%88%E6%81%AF%E7%9A%84%E6%B6%88%E8%B4%B9%E8%80%85)
+  * [概述](#%E6%A6%82%E8%BF%B0)
+* [NSQD](#nsqd)
+  * [<em><strong>nsqd</strong></em> 采用了SVC和WG框架](#nsqd-%E9%87%87%E7%94%A8%E4%BA%86svc%E5%92%8Cwg%E6%A1%86%E6%9E%B6)
+  * [<em><strong>nsqd</strong></em> 流程预览](#nsqd-%E6%B5%81%E7%A8%8B%E9%A2%84%E8%A7%88)
+  * [<em><strong>nsqd</strong></em> 源码详细流程图](#nsqd-%E6%BA%90%E7%A0%81%E8%AF%A6%E7%BB%86%E6%B5%81%E7%A8%8B%E5%9B%BE)
+* [NSQ工具](#nsq%E5%B7%A5%E5%85%B7)
+* [参考文献](#%E5%8F%82%E8%80%83%E6%96%87%E7%8C%AE)
 
 # NSQ组件
  NSQ 由 3 个守护进程组成:
