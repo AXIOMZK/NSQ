@@ -302,7 +302,7 @@ func consumer3(NSQDsAddrs []string) {
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test2.png)
 > * ```consumer1``` 接收到了 ```y```
 > * ```consumer2``` 接收到了 ```x,z```
- ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```
+ ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```  
 > * ```consumer3``` 接收到了 ```x,y,z```
  ```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
 
