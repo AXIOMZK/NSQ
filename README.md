@@ -4,8 +4,8 @@ NSQ可用于大规模系统中的实时消息服务，并且每天能够处理�
 
 NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。   
 
-* [NSQ组件](#nsq%E7%BB%84%E4%BB%B6)
-* [NSQ架构](#nsq%E6%9E%B6%E6%9E%84)
+* [NSQ组件](#NSQ组件)
+* [NSQ架构](#NSQ架构)
   * [<em><strong>topic</strong></em>  消息的逻辑关键词](#topic--%E6%B6%88%E6%81%AF%E7%9A%84%E9%80%BB%E8%BE%91%E5%85%B3%E9%94%AE%E8%AF%8D)
   * [<em><strong>producer</strong></em>   消息的生产者/发布者](#producer---%E6%B6%88%E6%81%AF%E7%9A%84%E7%94%9F%E4%BA%A7%E8%80%85%E5%8F%91%E5%B8%83%E8%80%85)
   * [<em><strong>channel</strong></em>  消息传递的通道](#channel--%E6%B6%88%E6%81%AF%E4%BC%A0%E9%80%92%E7%9A%84%E9%80%9A%E9%81%93)
