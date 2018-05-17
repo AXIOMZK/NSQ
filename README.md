@@ -120,9 +120,10 @@ nsqadmin --lookupd-http-address=localhost:4161
 
 ## 测试1
 > 2个Producer  1个Consumer
-> produce1() 发布publish "x","y" 到 topic "test"
-> produce2() 发布publish "z" 到 topic "test"
-> consumer1() 订阅subscribe  channel "sensor01"  of topic "test"
+produce1() 发布publish "x","y" 到 topic "test"
+produce2() 发布publish "z" 到 topic "test"
+consumer1() 订阅subscribe  channel "sensor01"  of topic "test"
+
 ```go
 package test
 
