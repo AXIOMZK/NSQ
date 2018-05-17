@@ -54,8 +54,19 @@ NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故�
 
 
 # NSQD  
-![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd.png)  
+
+  
+
+* ##  ***```nsqd```*** 采用了SVC和WG框架  
 ![SVG](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/SVG&WG.png)  
+    
+* ##  ***```nsqd```*** 流程预览  
+![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd.png)  
+
+* ##   ***```nsqd```*** 源码详细流程图  
+![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqdflow.png) 
+ 
+ 
 
 
 
