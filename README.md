@@ -190,6 +190,7 @@ func consumer1(NSQDsAddrs []string) {
 ```
 
 **测试结果**
+
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test1.png)
 >  ```x,y,z``` 都被 ```consumer1``` 接收了。注意到接收时间， ```x,y``` 几乎同时被接收，它们都由 ```producer1``` 发布，而 ```z``` 由 ```producer2``` 发布，中间间隔10秒。测试了很多次都是10秒,偶尔是15秒或20秒。查看了ConnectToNSQDs()
 ```go
@@ -299,12 +300,14 @@ func consumer3(NSQDsAddrs []string) {
 ```
 
 **测试结果**
+
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test2.png)
 > * ```consumer1``` 接收到了 ```y```
 > * ```consumer2``` 接收到了 ```x,z```
-> * ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```
 > * ```consumer3``` 接收到了 ```x,y,z```
-> * ```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
+
+> ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```
+>  ```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
 
 
 # NSQ工具
