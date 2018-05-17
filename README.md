@@ -131,23 +131,19 @@ import (
         "log"
         "time"
         "testing"
+        "strconv"
 
         "github.com/nsqio/go-nsq"
-        "strconv"
 )
 
-// 2个Producer  1个Consumer
-// produce1() 发布publish "x","y" 到 topic "test"
-// produce2() 发布publish "z" 到 topic "test"
-// consumer1() 订阅subscribe  channel "sensor01"  of topic "test"
-func TestNSQ(t *testing.T) {
-        go consumer1()
-        go produce1()
-        go produce2()
-        time.Sleep(30 * time.Second)
+func TestNSQ1(t *testing.T) {
+       NSQDsAddrs := []string{"127.0.0.1:4150", "127.0.0.1:4152"}
+       go consumer1(NSQDsAddrs)
+       go produce1()
+       go produce2()
+       time.Sleep(30 * time.Second)
 }
 
-// 生产者1
 func produce1() {
         cfg := nsq.NewConfig()
         nsqdAddr := "127.0.0.1:4150"
@@ -155,8 +151,6 @@ func produce1() {
         if err != nil {
                 log.Fatal(err)
         }
-        // 发布消息
-
         if err := producer.Publish("test", []byte("x")); err != nil {
                 log.Fatal("publish error: " + err.Error())
         }
@@ -165,7 +159,6 @@ func produce1() {
         }
 }
 
-// 生产者2
 func produce2() {
         cfg := nsq.NewConfig()
         nsqdAddr := "127.0.0.1:4152"
@@ -173,34 +166,23 @@ func produce2() {
         if err != nil {
                 log.Fatal(err)
         }
-        // 发布消息
-
         if err := producer.Publish("test", []byte("z")); err != nil {
                 log.Fatal("publish error: " + err.Error())
         }
-
 }
 
-// 消费者
-func consumer1() {
+func consumer1(NSQDsAddrs []string) {
         cfg := nsq.NewConfig()
         consumer, err := nsq.NewConsumer("test", "sensor01", cfg)
         if err != nil {
                 log.Fatal(err)
         }
-        // 设置消息处理函数
         consumer.AddHandler(nsq.HandlerFunc(
                 func(message *nsq.Message) error {
                         log.Println(string(message.Body) + " C1")
                         return nil
                 }))
-        // 连接到单例nsqd
-        //if err := consumer.ConnectToNSQD("127.0.0.1:4150"); err != nil {
-        //        log.Fatal(err, " C1")
-        //}
-
-        // 连接到多个nsqd
-        if err := consumer.ConnectToNSQDs([]string{"127.0.0.1:4150","127.0.0.1:4152"}); err != nil {
+        if err := consumer.ConnectToNSQDs(NSQDsAddrs); err != nil {
                 log.Fatal(err, " C1")
         }
         <-consumer.StopChan
@@ -208,7 +190,6 @@ func consumer1() {
 ```
 
 **测试结果**
-
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test1.png)
 >  ```x,y,z``` 都被 ```consumer1``` 接收了。注意到接收时间， ```x,y``` 几乎同时被接收，它们都由 ```producer1``` 发布，而 ```z``` 由 ```producer2``` 发布，中间间隔10秒。测试了很多次都是10秒,偶尔是15秒或20秒。查看了ConnectToNSQDs()
 ```go
@@ -220,6 +201,111 @@ func consumer1() {
 > Consumer每隔x秒，向nsqlookud进行http轮询，用来更新自己的nsqd地址目录,当一个producer的channel一直没有数据时，则会轮询到下一个producer
 
 ## 测试2
+> * 1个Producer  3个Consumer
+> * produce3() 发布publish "x","y","z" 到 topic "test"
+> * consumer1() 订阅subscribe  channel "sensor01"  of topic "test"
+> * consumer2() 订阅subscribe  channel "sensor01"  of topic "test"
+> * consumer3() 订阅subscribe  channel "sensor02"  of topic "test"
+
+```go
+package test
+
+import (
+        "log"
+        "time"
+        "testing"
+        "strconv"
+
+        "github.com/nsqio/go-nsq"
+)
+
+func TestNSQ2(t *testing.T) {
+        NSQDsAddrs := []string{"127.0.0.1:4150"}
+        go consumer1(NSQDsAddrs)
+        go consumer2(NSQDsAddrs)
+        go consumer3(NSQDsAddrs)
+        go produce3()
+        time.Sleep(5 * time.Second)
+}
+
+func produce3() {
+        cfg := nsq.NewConfig()
+        nsqdAddr := "127.0.0.1:4150"
+        producer, err := nsq.NewProducer(nsqdAddr, cfg)
+        if err != nil {
+                log.Fatal(err)
+        }
+        if err := producer.Publish("test", []byte("x")); err != nil {
+                log.Fatal("publish error: " + err.Error())
+        }
+        if err := producer.Publish("test", []byte("y")); err != nil {
+                log.Fatal("publish error: " + err.Error())
+        }
+        if err := producer.Publish("test", []byte("z")); err != nil {
+                log.Fatal("publish error: " + err.Error())
+        }
+}
+
+func consumer1(NSQDsAddrs []string) {
+        cfg := nsq.NewConfig()
+        consumer, err := nsq.NewConsumer("test", "sensor01", cfg)
+        if err != nil {
+                log.Fatal(err)
+        }
+        consumer.AddHandler(nsq.HandlerFunc(
+                func(message *nsq.Message) error {
+                        log.Println(string(message.Body) + " C1")
+                        return nil
+                }))
+        if err := consumer.ConnectToNSQDs(NSQDsAddrs); err != nil {
+                log.Fatal(err, " C1")
+        }
+        <-consumer.StopChan
+}
+
+func consumer2(NSQDsAddrs []string) {
+        cfg := nsq.NewConfig()
+        consumer, err := nsq.NewConsumer("test", "sensor01", cfg)
+        if err != nil {
+                log.Fatal(err)
+        }
+        consumer.AddHandler(nsq.HandlerFunc(
+                func(message *nsq.Message) error {
+                        log.Println(string(message.Body) + " C2")
+                        return nil
+                }))
+        if err := consumer.ConnectToNSQDs(NSQDsAddrs); err != nil {
+                log.Fatal(err, " C2")
+        }
+        <-consumer.StopChan
+}
+
+func consumer3(NSQDsAddrs []string) {
+        cfg := nsq.NewConfig()
+        consumer, err := nsq.NewConsumer("test", "sensor02", cfg)
+        if err != nil {
+                log.Fatal(err)
+        }
+        consumer.AddHandler(nsq.HandlerFunc(
+                func(message *nsq.Message) error {
+                        log.Println(string(message.Body) + " C3")
+                        return nil
+                }))
+        if err := consumer.ConnectToNSQDs(NSQDsAddrs); err != nil {
+               log.Fatal(err, " C3")
+        }
+        <-consumer.StopChan
+}
+```
+
+**测试结果**
+![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test2.png)
+> * ```consumer1``` 接收到了 ```y```
+> * ```consumer2``` 接收到了 ```x,z```
+ ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```
+> * ```consumer3``` 接收到了 ```x,y,z```
+ ```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
+
 
 # NSQ工具
 * nsq_pubsub
