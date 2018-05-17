@@ -30,7 +30,7 @@ NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故�
 
 # NSQ架构  
 
-![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/NSQ.png)
+![NSQ](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/NSQ.png)
 
 * ##  ***topic***  消息的逻辑关键词
   +  **```topic```** 是 **```NSQ```** 消息发布的 **```逻辑关键词```** ，可以理解为人为定义的一种消息类型。当程序初次发布带 **```topic```** 的消息时,如果 **```topic```** 不存在,则会在 ***```nsqd```*** 中创建。
