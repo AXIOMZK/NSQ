@@ -234,9 +234,8 @@ func consumer1() {
 
 [[1]GoDoc of nsq [EB/OL]](https://godoc.org/github.com/bitly/nsq)  
 [[2]NSQ v1.0.0-compat DESIGN [EB/OL]](https://nsq.io/overview/design.html)  
-[[3]消息中间件NSQ深入与实践 [EB/OL]](https://www.jianshu.com/p/2b01403e3443)  
-[[4]NSQ消息队列详解 [EB/OL]](http://xiaoh.me/2018/02/13/nsq-summary/)  
-[[5]NSQ使用总结 [EB/OL]](http://lihaoquan.me/2016/6/20/using-nsq.html)
+[[3]A Journey Into NSQ [EB/OL]](https://blog.gopheracademy.com/advent-2013/day-22-a-journey-into-nsq/)
+
 
 
 
