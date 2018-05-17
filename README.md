@@ -307,7 +307,7 @@ func consumer3(NSQDsAddrs []string) {
 > * ```consumer3``` 接收到了 ```x,y,z```
 
 > ***```channel```*** ***```sensor01```*** 中的消息被随机的分到了 ```consumer1``` 和 ```consumer2```
->  ```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
+```consumer3``` 单独占有 ***```channel```*** ***```sensor02```*** ，接收了其中的所有消息
 
 
 # NSQ工具
