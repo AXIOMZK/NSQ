@@ -12,9 +12,9 @@
   * [<em><strong>consumer</strong></em>  消息的消费者](#consumer--%E6%B6%88%E6%81%AF%E7%9A%84%E6%B6%88%E8%B4%B9%E8%80%85)
   * [概述](#%E6%A6%82%E8%BF%B0)
 * [NSQD](#nsqd)
-  * [<em><strong>nsqd</strong></em> 采用了SVC和WG框架](#nsqd-%E9%87%87%E7%94%A8%E4%BA%86svc%E5%92%8Cwg%E6%A1%86%E6%9E%B6)
-  * [<em><strong>nsqd</strong></em> 流程预览](#nsqd-%E6%B5%81%E7%A8%8B%E9%A2%84%E8%A7%88)
-  * [<em><strong>nsqd</strong></em> 源码详细流程图](#nsqd-%E6%BA%90%E7%A0%81%E8%AF%A6%E7%BB%86%E6%B5%81%E7%A8%8B%E5%9B%BE)
+  * [<em><strong>nsqd</strong></em> 基本结构](#nsqd-%E5%9F%BA%E6%9C%AC%E7%BB%93%E6%9E%84)
+  * [<em><strong>nsqd</strong></em> 源码概述](#nsqd-%E6%BA%90%E7%A0%81%E6%A6%82%E8%BF%B0)
+  * [<em><strong>nsqd</strong></em> 详细流程图](#nsqd-%E8%AF%A6%E7%BB%86%E6%B5%81%E7%A8%8B%E5%9B%BE)
 * [NSQ使用](#nsq%E4%BD%BF%E7%94%A8)
   * [测试1](#%E6%B5%8B%E8%AF%951)
   * [测试2](#%E6%B5%8B%E8%AF%952)
@@ -72,14 +72,14 @@
 # NSQD  
 
 
-* ##  ***```nsqd```*** 采用了SVC和WG框架  
+* ##  ***```nsqd```*** 基本结构  
 ![SVG](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/SVG&WG.png)
 >  + 利用svc框架来启动服务, Run 时, 先后调用svc框架的 Init 和 Start 方法 ，然后开始不断监听退出的信号量, 最后调用 svc框架的Stop 方法来退出。
 >  + svc框架的Start方法从本地文件读取数据初始化topic和channel，然后调用功能入口Main方法。Main方法利用waitGroup框架来启动4个服务线程，至此启动完毕。
 >  + WaitGroup来自sync包，用于线程同步，单从字面意思理解，wait等待的意思，group组、团队的意思，WaitGroup就是等待一组服务执行完成后才会继续向下执行，涉及到WG个数的操作都使用原子操作来保证线程安全。  
   
    
-* ##  ***```nsqd```*** 流程预览  
+* ##  ***```nsqd```*** 源码概述  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
 > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
 >  
@@ -307,7 +307,7 @@ func (t *Topic) messagePump() {
 
 ```
 
-* ##   ***```nsqd```*** 源码详细流程图  
+* ##   ***```nsqd```*** 详细流程图  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
 
 
