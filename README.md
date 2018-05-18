@@ -84,7 +84,7 @@
 >  +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***  
 > 
 ```go
-tcpServer := &tcpServer{ctx: ctx}
+	tcpServer := &tcpServer{ctx: ctx}
 	n.waitGroup.Wrap(func() {
 		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
 	})
