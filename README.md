@@ -2,7 +2,8 @@
 
 > NSQ可用于大规模系统中的实时消息服务，并且每天能够处理数亿级别的消息，其设计目标是为在分布式环境下运行的去中心化服务提供一个强大的基础架构。
 
-> NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。     
+> NSQ具有分布式、去中心化的拓扑结构，该结构具有无单点故障、故障容错、高可用性以及能够保证消息的可靠传递的特征。NSQ非常容易配置和部署，且具有最大的灵活性，支持众多消息协议。  
+
 * [NSQ组件](#nsq%E7%BB%84%E4%BB%B6)
 * [NSQ架构](#nsq%E6%9E%B6%E6%9E%84)
   * [<em><strong>topic</strong></em>  消息的逻辑关键词](#topic--%E6%B6%88%E6%81%AF%E7%9A%84%E9%80%BB%E8%BE%91%E5%85%B3%E9%94%AE%E8%AF%8D)
@@ -80,14 +81,26 @@
    
 * ##  ***```nsqd```*** 流程预览  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
->  +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***
+>  +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***  
+> 
+```go
+tcpServer := &tcpServer{ctx: ctx}
+	n.waitGroup.Wrap(func() {
+		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
+	})
+	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
+	n.waitGroup.Wrap(func() {
+		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
+	})
+```  
+
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/1.png)  
 >  +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/2.png)  
->  + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client
+>  + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/3.png)  
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/4.png)
-> +
+>  +  
   
 
 * ##   ***```nsqd```*** 源码详细流程图  
