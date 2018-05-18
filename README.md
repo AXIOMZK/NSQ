@@ -81,9 +81,10 @@
    
 * ##  ***```nsqd```*** 流程预览  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
->  +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***  
-> 
+> +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
+>  
 ```go
+	//nsqd/nsqd.go:238
 	tcpServer := &tcpServer{ctx: ctx}
 	n.waitGroup.Wrap(func() {
 		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
@@ -93,14 +94,48 @@
 		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
 	})
 ```  
-
-  ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/1.png)  
->  +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
-  ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/2.png)  
->  + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)
+> +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
+>  
+```go
+	//nsqd/tcp.go:31
+	var prot protocol.Protocol
+	switch protocolMagic {
+	case "  V2":
+		prot = &protocolV2{ctx: p.ctx}
+	default:
+		protocol.SendFramedResponse(clientConn, frameTypeError, []byte("E_BAD_PROTOCOL"))
+		clientConn.Close()
+		p.ctx.nsqd.logf(LOG_ERROR, "client(%s) bad protocol magic '%s'",
+			clientConn.RemoteAddr(), protocolMagic)
+		return
+	}
+	err = prot.IOLoop(clientConn)
+```  
+ 
+> + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
+> 
+```go
+func (p *protocolV2) IOLoop(conn net.Conn) error {
+   ...
+	
+	clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
+	client := newClientV2(clientID, conn, p.ctx)
+	
+	// synchronize the startup of messagePump in order
+	// to guarantee that it gets a chance to initialize
+	// goroutine local state derived from client attributes
+	// and avoid a potential race with IDENTIFY (where a client
+	// could have changed or disabled said attributes)
+	messagePumpStartedChan := make(chan bool)
+	go p.messagePump(client, messagePumpStartedChan)
+	<-messagePumpStartedChan
+	
+	...
+} 
+```
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/3.png)  
   ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/4.png)
->  +  
+> +  
   
 
 * ##   ***```nsqd```*** 源码详细流程图  
