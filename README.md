@@ -72,14 +72,14 @@
 # NSQD  
 
 
-* ##  ***```nsqd```*** 采用了SVC和WG框架  
+* ##  ***```nsqd```*** 基本结构  
 ![SVG](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/SVG&WG.png)
 >  + 利用svc框架来启动服务, Run 时, 先后调用svc框架的 Init 和 Start 方法 ，然后开始不断监听退出的信号量, 最后调用 svc框架的Stop 方法来退出。
 >  + svc框架的Start方法从本地文件读取数据初始化topic和channel，然后调用功能入口Main方法。Main方法利用waitGroup框架来启动4个服务线程，至此启动完毕。
 >  + WaitGroup来自sync包，用于线程同步，单从字面意思理解，wait等待的意思，group组、团队的意思，WaitGroup就是等待一组服务执行完成后才会继续向下执行，涉及到WG个数的操作都使用原子操作来保证线程安全。  
   
    
-* ##  ***```nsqd```*** 流程预览  
+* ##  ***```nsqd```*** 源码概述  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
 > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
 >  
@@ -340,7 +340,7 @@ func (c *Channel) put(m *Message) error {
         }
 ```
 
-* ##   ***```nsqd```*** 源码详细流程图  
+* ##   ***```nsqd```*** 详细流程图  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
 
 
