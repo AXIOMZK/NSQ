@@ -166,8 +166,146 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 	...
 ```  
 
-> +  
-  
+> +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。  
+```go
+//nsqd/protocol_v2.go:165
+func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
+	...
+	switch {
+	case bytes.Equal(params[0], []byte("FIN")):
+		return p.FIN(client, params)
+	case bytes.Equal(params[0], []byte("RDY")):
+		return p.RDY(client, params)
+	case bytes.Equal(params[0], []byte("REQ")):
+		return p.REQ(client, params)
+	case bytes.Equal(params[0], []byte("PUB")):
+		return p.PUB(client, params)
+	case bytes.Equal(params[0], []byte("MPUB")):
+		return p.MPUB(client, params)
+	case bytes.Equal(params[0], []byte("DPUB")):
+		return p.DPUB(client, params)
+	case bytes.Equal(params[0], []byte("NOP")):
+		return p.NOP(client, params)
+	case bytes.Equal(params[0], []byte("TOUCH")):
+		return p.TOUCH(client, params)
+	case bytes.Equal(params[0], []byte("SUB")):
+		return p.SUB(client, params)
+	case bytes.Equal(params[0], []byte("CLS")):
+		return p.CLS(client, params)
+	case bytes.Equal(params[0], []byte("AUTH")):
+		return p.AUTH(client, params)
+	}
+	return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))
+}
+```
+
+> +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收。
+```go
+//nsqd/protocol_v2.go:757 
+func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
+	...
+	topic := p.ctx.nsqd.GetTopic(topicName)
+	msg := NewMessage(topic.GenerateID(), messageBody)
+	err = topic.PutMessage(msg)
+    ...
+}
+
+//nsqd/topic.go:197
+func (t *Topic) put(m *Message) error {
+	select {
+	case t.memoryMsgChan <- m:
+	default:
+		b := bufferPoolGet()
+		err := writeMessageToBackend(b, m, t.backend)
+		bufferPoolPut(b)
+		t.ctx.nsqd.SetHealth(err)
+		if err != nil {
+			t.ctx.nsqd.logf(LOG_ERROR,
+				"TOPIC(%s) ERROR: failed to write message to backend - %s",
+				t.name, err)
+			return err
+		}
+	}
+	return nil
+}
+```
+
+
+> +  了解了消息的产生，现在看下消息的传递。在nsqd/topic.go中有一个NewTopic()。其中又调用了messagePump()，注意这个和上面IOLoop的messagePump()不一样。
+```go
+//nsqd/topic.go:44
+func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topic {
+	t := &Topic{
+		name:              topicName,
+		channelMap:        make(map[string]*Channel),
+		memoryMsgChan:     make(chan *Message, ctx.nsqd.getOpts().MemQueueSize),
+		exitChan:          make(chan int),
+		channelUpdateChan: make(chan int),
+		ctx:               ctx,
+		pauseChan:         make(chan bool),
+		deleteCallback:    deleteCallback,
+		idFactory:         NewGUIDFactory(ctx.nsqd.getOpts().ID),
+	}
+
+	...
+
+	t.waitGroup.Wrap(func() { t.messagePump() })
+
+	t.ctx.nsqd.Notify(t)
+
+	return t
+}
+```
+
+> +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel
+```go
+//nsqd/topic.go:220
+func (t *Topic) messagePump() {
+	...
+	for {
+		select {
+		case msg = <-memoryMsgChan:
+		case buf = <-backendChan:
+			msg, err = decodeMessage(buf)
+			...
+		case <-t.channelUpdateChan:
+			...
+		case pause := <-t.pauseChan:
+			...
+		case <-t.exitChan:
+			goto exit
+		}
+
+		for i, channel := range chans {
+			chanMsg := msg
+			// copy the message because each channel
+			// needs a unique instance but...
+			// fastpath to avoid copy if its the first channel
+			// (the topic already created the first copy)
+			if i > 0 {
+				chanMsg = NewMessage(msg.ID, msg.Body)
+				chanMsg.Timestamp = msg.Timestamp
+				chanMsg.deferred = msg.deferred
+			}
+			if chanMsg.deferred != 0 {
+				channel.PutMessageDeferred(chanMsg, chanMsg.deferred)
+				continue
+			}
+			err := channel.PutMessage(chanMsg)
+			...
+			}
+		}
+	}
+	...
+}
+```
+
+> +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
+```go
+//nsqd/topic.go:220
+
+
+```
 
 * ##   ***```nsqd```*** 源码详细流程图  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
@@ -409,6 +547,7 @@ func consumer3(NSQDsAddrs []string) {
 [[1]GoDoc of nsq [EB/OL]](https://godoc.org/github.com/bitly/nsq)  
 [[2]NSQ v1.0.0-compat DESIGN [EB/OL]](https://nsq.io/overview/design.html)  
 [[3]A Journey Into NSQ [EB/OL]](https://blog.gopheracademy.com/advent-2013/day-22-a-journey-into-nsq/)
+
 
 
 
