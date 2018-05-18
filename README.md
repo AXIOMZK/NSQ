@@ -72,14 +72,14 @@
 # NSQD  
 
 
-* ##  ***```nsqd```*** 基本结构  
+* ##  ***```nsqd```*** 采用了SVC和WG框架  
 ![SVG](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/SVG&WG.png)
 >  + 利用svc框架来启动服务, Run 时, 先后调用svc框架的 Init 和 Start 方法 ，然后开始不断监听退出的信号量, 最后调用 svc框架的Stop 方法来退出。
 >  + svc框架的Start方法从本地文件读取数据初始化topic和channel，然后调用功能入口Main方法。Main方法利用waitGroup框架来启动4个服务线程，至此启动完毕。
 >  + WaitGroup来自sync包，用于线程同步，单从字面意思理解，wait等待的意思，group组、团队的意思，WaitGroup就是等待一组服务执行完成后才会继续向下执行，涉及到WG个数的操作都使用原子操作来保证线程安全。  
   
    
-* ##  ***```nsqd```*** 源码概述  
+* ##  ***```nsqd```*** 流程预览  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
 > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
 >  
@@ -199,7 +199,8 @@ func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 }
 ```
 
-> +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收。
+> +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
+> +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收。
 ```go
 //nsqd/protocol_v2.go:757 
 func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
@@ -257,7 +258,7 @@ func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topi
 }
 ```
 
-> +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel
+> +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel。
 ```go
 //nsqd/topic.go:220
 func (t *Topic) messagePump() {
@@ -301,13 +302,45 @@ func (t *Topic) messagePump() {
 ```
 
 > +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
+> + 最后由一开始介绍的protocol实例的messagePump方法从memoryMsgChan或backendMsgChan读取消息并通过p.SendMessage(client, msg)发送到客户端 ，消息写入client.Writer。
 ```go
-//nsqd/topic.go:220
+//nsqd/channel.go:220
+func (c *Channel) put(m *Message) error {
+	select {
+	case c.memoryMsgChan <- m:
+	default:
+		b := bufferPoolGet()
+		err := writeMessageToBackend(b, m, c.backend)
+		bufferPoolPut(b)
+		c.ctx.nsqd.SetHealth(err)
+		if err != nil {
+			c.ctx.nsqd.logf(LOG_ERROR, "CHANNEL(%s): failed to write message to backend - %s",
+				c.name, err)
+			return err
+		}
+	}
+	return nil
+}
 
-
+//nsqd/protocol_v2.go:258
+		select {
+       		...
+		case b := <-backendMsgChan:
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+		case msg := <-memoryMsgChan:
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+        }
 ```
 
-* ##   ***```nsqd```*** 详细流程图  
+* ##   ***```nsqd```*** 源码详细流程图  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
 
 
@@ -547,8 +580,3 @@ func consumer3(NSQDsAddrs []string) {
 [[1]GoDoc of nsq [EB/OL]](https://godoc.org/github.com/bitly/nsq)  
 [[2]NSQ v1.0.0-compat DESIGN [EB/OL]](https://nsq.io/overview/design.html)  
 [[3]A Journey Into NSQ [EB/OL]](https://blog.gopheracademy.com/advent-2013/day-22-a-journey-into-nsq/)
-
-
-
-
-
