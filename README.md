@@ -115,8 +115,10 @@
 > + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
 > 
 ```go
-func (p *protocolV2) IOLoop(conn net.Conn) error {
-   ...
+//nsqd/protocol_v2.go:41
+func (p *protocolV2) IOLoop(conn net.Conn) error {  
+	
+	...
 	
 	clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
 	client := newClientV2(clientID, conn, p.ctx)
@@ -132,9 +134,38 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 	
 	...
 } 
-```
-  ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/3.png)  
-  ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/4.png)
+```  
+  
+```go
+//nsqd/protocol_v2.go:200
+func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
+	...
+	var memoryMsgChan chan *Message
+	var backendMsgChan chan []byte
+	var subChannel *Channel
+	...
+	
+	select {		
+			...		
+		case b := <-backendMsgChan:
+			...
+			msg, err := decodeMessage(b)
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+		case msg := <-memoryMsgChan:
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+		}
+	
+	...
+```  
+
 > +  
   
 
