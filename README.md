@@ -78,12 +78,15 @@
 >  + svc框架的Start方法从本地文件读取数据初始化topic和channel，然后调用功能入口Main方法。Main方法利用waitGroup框架来启动4个服务线程，至此启动完毕。
 >  + WaitGroup来自sync包，用于线程同步，单从字面意思理解，wait等待的意思，group组、团队的意思，WaitGroup就是等待一组服务执行完成后才会继续向下执行，涉及到WG个数的操作都使用原子操作来保证线程安全。  
   
+
+* ##   ***```nsqd```*** 详细流程图  
+![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
    
 * ##  ***```nsqd```*** 源码概述  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
-> +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
->  
-```go
+ > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
+  
+  ```go
 	//nsqd/nsqd.go:238
 	tcpServer := &tcpServer{ctx: ctx}
 	n.waitGroup.Wrap(func() {
@@ -94,9 +97,9 @@
 		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
 	})
 ```  
-> +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
->  
-```go
+ > +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
+ 
+  ```go
 	//nsqd/tcp.go:31
 	var prot protocol.Protocol
 	switch protocolMagic {
@@ -110,14 +113,13 @@
 		return
 	}
 	err = prot.IOLoop(clientConn)
-```  
- 
-> + protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
-> 
-```go
+```
+
+ > +  protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)
+  
+	```go
 //nsqd/protocol_v2.go:41
 func (p *protocolV2) IOLoop(conn net.Conn) error {  
-	
 	...
 	
 	clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
@@ -135,7 +137,6 @@ func (p *protocolV2) IOLoop(conn net.Conn) error {
 	...
 } 
 ```  
-  
 ```go
 //nsqd/protocol_v2.go:200
 func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
@@ -162,12 +163,12 @@ func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
 			err = p.SendMessage(client, msg)
 			...
 		}
-	
 	...
 ```  
 
-> +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。  
-```go
+	> +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。
+  
+	```go
 //nsqd/protocol_v2.go:165
 func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 	...
@@ -199,10 +200,12 @@ func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
 }
 ```
 
-> +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
-> +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收。
-```go
-//nsqd/protocol_v2.go:757 
+ > +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
+ > +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收
+
+
+ ```go
+//nsqd/protocol_v2.go:757
 func (p *protocolV2) PUB(client *clientV2, params [][]byte) ([]byte, error) {
 	...
 	topic := p.ctx.nsqd.GetTopic(topicName)
@@ -232,8 +235,9 @@ func (t *Topic) put(m *Message) error {
 ```
 
 
-> +  了解了消息的产生，现在看下消息的传递。在nsqd/topic.go中有一个NewTopic()。其中又调用了messagePump()，注意这个和上面IOLoop的messagePump()不一样。
-```go
+ > +  了解了消息的产生，现在看下消息的传递。在nsqd/topic.go中有一个NewTopic()。其中又调用了messagePump()，注意这个和上面IOLoop的messagePump()不一样。
+
+  ```go
 //nsqd/topic.go:44
 func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topic {
 	t := &Topic{
@@ -258,8 +262,9 @@ func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topi
 }
 ```
 
-> +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel。
-```go
+ > +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel。
+
+  ```go
 //nsqd/topic.go:220
 func (t *Topic) messagePump() {
 	...
@@ -301,9 +306,10 @@ func (t *Topic) messagePump() {
 }
 ```
 
-> +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
-> + 最后由一开始介绍的protocol实例的messagePump方法从memoryMsgChan或backendMsgChan读取消息并通过p.SendMessage(client, msg)发送到客户端 ，消息写入client.Writer。
-```go
+ > +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
+ > + 最后由一开始介绍的protocol实例的messagePump方法从memoryMsgChan或backendMsgChan读取消息并通过p.SendMessage(client, msg)发送到客户端 ，消息写入client.Writer。
+
+  ```go
 //nsqd/channel.go:220
 func (c *Channel) put(m *Message) error {
 	select {
@@ -340,29 +346,28 @@ func (c *Channel) put(m *Message) error {
         }
 ```
 
-* ##   ***```nsqd```*** 详细流程图  
-![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
-
-
- 
 
 # NSQ使用
 
 > 首先启动 ```nsdlookupd```
+
 ```shell
 nsqlookupd
 ```
+
 * 客户端通过查询 ```nsdlookupd``` 来发现指定topic的生产者，并且 ```nsqd``` 节点广播 ```topic``` 和通道 ```channel``` 信息
 * 该服务运行后有两个端口：TCP 接口，```nsqd``` 用它来广播；HTTP 接口，客户端用它来发现和管理。
 * 在生产环境中，为了高可用，最好部署三个nsqlookupd服务。
 
 > 先创建 ```nsqd``` 的数据路径
+
 ```shell
 mkdir /tmp/nsqdata1 /tmp/nsqdata2
 ```
 
 
 > 运行两个测试的 ```nsqd``` 实例
+
 ```shell
 nsqd --lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 -tcp-address=127.0.0.1:4150 -http-address=0.0.0.0:4151 -data-path=/tmp/nsqdata1
 
@@ -375,6 +380,7 @@ nsqd --lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 -tcp-addr
 * 删除```topic```、```channel```需要```HTTP API```调用。
 
 > 启动 ```nsqadmin``` 前端Web监控
+
 ```shell
 nsqadmin --lookupd-http-address=localhost:4161
 ```
@@ -457,6 +463,7 @@ func consumer1(NSQDsAddrs []string) {
 
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/test/test1.png)
 >  ```x,y,z``` 都被 ```consumer1``` 接收了。注意到接收时间， ```x,y``` 几乎同时被接收，它们都由 ```producer1``` 发布，而 ```z``` 由 ```producer2``` 发布，中间间隔10秒。测试了很多次都是10秒,偶尔是15秒或20秒。查看了ConnectToNSQDs()
+
 ```go
 // ConnectToNSQDs takes multiple nsqd addresses to connect directly to.
 //
