@@ -84,7 +84,7 @@
    
 * ##  ***```nsqd```*** 源码概述  
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
- > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
+> +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
   
 	```go
 	//nsqd/nsqd.go:238
@@ -97,7 +97,7 @@
 		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
 	})
 	```  
- > +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
+> +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
  
   ```go
 	//nsqd/tcp.go:31
@@ -115,7 +115,7 @@
 	err = prot.IOLoop(clientConn)
 	```
 
- > +  protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
+> +  protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
 
   
 	```go
@@ -167,7 +167,7 @@
 		...
 	```  
 
-	> +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。
+> +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。
   
 	```go
 	//nsqd/protocol_v2.go:165
@@ -201,8 +201,8 @@
 	}
 	```
 
- > +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
- > +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收
+> +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
+> +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收
 
 
 ```go
@@ -236,7 +236,7 @@ func (t *Topic) put(m *Message) error {
 ```
 
 
- > +  了解了消息的产生，现在看下消息的传递。在nsqd/topic.go中有一个NewTopic()。其中又调用了messagePump()，注意这个和上面IOLoop的messagePump()不一样。
+> +  了解了消息的产生，现在看下消息的传递。在nsqd/topic.go中有一个NewTopic()。其中又调用了messagePump()，注意这个和上面IOLoop的messagePump()不一样。
 
 ```go
 //nsqd/topic.go:44
@@ -263,7 +263,7 @@ func NewTopic(topicName string, ctx *context, deleteCallback func(*Topic)) *Topi
 }
 ```
 
- > +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel。
+> +  看下t.messagePump()。topic的messagePump函数会不断从memoryMsgChan/backend队列中读消息，并将消息每个复制一遍，发送给topic下的所有channel。
 
 ```go
 //nsqd/topic.go:220
@@ -307,8 +307,8 @@ func (t *Topic) messagePump() {
 }
 ```
 
- > +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
- > + 最后由一开始介绍的protocol实例的messagePump方法从memoryMsgChan或backendMsgChan读取消息并通过p.SendMessage(client, msg)发送到客户端 ，消息写入client.Writer。
+> +  channel的PutMessage方法和topic类似的，也是调用了put,首先写入memoryMsgChan，满了写入backend。
+> + 最后由一开始介绍的protocol实例的messagePump方法从memoryMsgChan或backendMsgChan读取消息并通过p.SendMessage(client, msg)发送到客户端 ，消息写入client.Writer。
 
 ```go
 //nsqd/channel.go:220
