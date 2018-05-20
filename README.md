@@ -86,120 +86,120 @@
 ![nsqd](https://github.com/VeniVidiViciVK/NSQ/raw/master/docs/nsqd/nsqd.png)
 > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
   
-	```go
-	//nsqd/nsqd.go:238
-	tcpServer := &tcpServer{ctx: ctx}
-	n.waitGroup.Wrap(func() {
-		protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
-	})
-	httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
-	n.waitGroup.Wrap(func() {
-		http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
-	})
-	```  
+```go
+//nsqd/nsqd.go:238
+tcpServer := &tcpServer{ctx: ctx}
+n.waitGroup.Wrap(func() {
+	protocol.TCPServer(n.tcpListener, tcpServer, n.logf)
+})
+httpServer := newHTTPServer(ctx, false, n.getOpts().TLSRequired == TLSRequired)
+n.waitGroup.Wrap(func() {
+	http_api.Serve(n.httpListener, httpServer, "HTTP", n.logf)
+})
+```
 > +  ***``` TCP```*** 接收到客户端的请求后，创建protocol实例并调用nsqd/tcp.go中IOLoop()方法  
  
-  ```go
-	//nsqd/tcp.go:31
-	var prot protocol.Protocol
-	switch protocolMagic {
-	case "  V2":
-		prot = &protocolV2{ctx: p.ctx}
-	default:
-		protocol.SendFramedResponse(clientConn, frameTypeError, []byte("E_BAD_PROTOCOL"))
-		clientConn.Close()
-		p.ctx.nsqd.logf(LOG_ERROR, "client(%s) bad protocol magic '%s'",
-			clientConn.RemoteAddr(), protocolMagic)
-		return
-	}
-	err = prot.IOLoop(clientConn)
-	```
+```go
+//nsqd/tcp.go:31
+var prot protocol.Protocol
+switch protocolMagic {
+case "  V2":
+	prot = &protocolV2{ctx: p.ctx}
+default:
+	protocol.SendFramedResponse(clientConn, frameTypeError, []byte("E_BAD_PROTOCOL"))
+	clientConn.Close()
+	p.ctx.nsqd.logf(LOG_ERROR, "client(%s) bad protocol magic '%s'",
+		clientConn.RemoteAddr(), protocolMagic)
+	return
+}
+err = prot.IOLoop(clientConn)
+```
 
 > +  protocol的IOLoop接收客户端的请求，根据命令的不同做相应处理。同时nsqd/protocol_v2.go中IOLoop会起一个goroutine运行messagePump()，该函数从该client订阅的channel中读取消息并发送给client(```consumer```)  
 
   
-	```go
-	//nsqd/protocol_v2.go:41
-	func (p *protocolV2) IOLoop(conn net.Conn) error {  
-		...
-	
-		clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
-		client := newClientV2(clientID, conn, p.ctx)
-	
-		// synchronize the startup of messagePump in order
-		// to guarantee that it gets a chance to initialize
-		// goroutine local state derived from client attributes
-		// and avoid a potential race with IDENTIFY (where a client
-		// could have changed or disabled said attributes)
-		messagePumpStartedChan := make(chan bool)
-		go p.messagePump(client, messagePumpStartedChan)
-		<-messagePumpStartedChan
-		
-		...
-	} 
-	```  
-	```go
-	//nsqd/protocol_v2.go:200
-	func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
-		...
-		var memoryMsgChan chan *Message
-		var backendMsgChan chan []byte
-		var subChannel *Channel
-		...
-	
-		select {		
-				...		
-			case b := <-backendMsgChan:
-				...
-				msg, err := decodeMessage(b)
-				...
-				subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
-				client.SendingMessage()
-				err = p.SendMessage(client, msg)
-				...
-			case msg := <-memoryMsgChan:
-				...
-				subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
-				client.SendingMessage()
-				err = p.SendMessage(client, msg)
-				...
-			}
-		...
-	```  
+```go
+//nsqd/protocol_v2.go:41
+func (p *protocolV2) IOLoop(conn net.Conn) error {
+	...
+
+	clientID := atomic.AddInt64(&p.ctx.nsqd.clientIDSequence, 1)
+	client := newClientV2(clientID, conn, p.ctx)
+
+	// synchronize the startup of messagePump in order
+	// to guarantee that it gets a chance to initialize
+	// goroutine local state derived from client attributes
+	// and avoid a potential race with IDENTIFY (where a client
+	// could have changed or disabled said attributes)
+	messagePumpStartedChan := make(chan bool)
+	go p.messagePump(client, messagePumpStartedChan)
+	<-messagePumpStartedChan
+
+	...
+}
+```
+```go
+//nsqd/protocol_v2.go:200
+func (p *protocolV2) messagePump(client *clientV2, startedChan chan bool) {
+	...
+	var memoryMsgChan chan *Message
+	var backendMsgChan chan []byte
+	var subChannel *Channel
+	...
+
+	select {
+			...
+		case b := <-backendMsgChan:
+			...
+			msg, err := decodeMessage(b)
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+		case msg := <-memoryMsgChan:
+			...
+			subChannel.StartInFlightTimeout(msg, client.ID, msgTimeout)
+			client.SendingMessage()
+			err = p.SendMessage(client, msg)
+			...
+		}
+	...
+```
 
 > +  然后我们看下memoryMsgChan，backendMsgChan是如何产生的。我们知道producer通过TCP或HTTP来发布消息。我们重点看下TCP时的处理过程。首先protocol的IOLoop会根据producer的不同请求做相应处理，Exec方法判断请求的参数，调用不同的方法。
-  
-	```go
-	//nsqd/protocol_v2.go:165
-	func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
-		...
-		switch {
-		case bytes.Equal(params[0], []byte("FIN")):
-			return p.FIN(client, params)
-		case bytes.Equal(params[0], []byte("RDY")):
-			return p.RDY(client, params)
-		case bytes.Equal(params[0], []byte("REQ")):
-			return p.REQ(client, params)
-		case bytes.Equal(params[0], []byte("PUB")):
-			return p.PUB(client, params)
-		case bytes.Equal(params[0], []byte("MPUB")):
-			return p.MPUB(client, params)
-		case bytes.Equal(params[0], []byte("DPUB")):
-			return p.DPUB(client, params)
-		case bytes.Equal(params[0], []byte("NOP")):
-			return p.NOP(client, params)
-		case bytes.Equal(params[0], []byte("TOUCH")):
-			return p.TOUCH(client, params)
-		case bytes.Equal(params[0], []byte("SUB")):
-			return p.SUB(client, params)
-		case bytes.Equal(params[0], []byte("CLS")):
-			return p.CLS(client, params)
-		case bytes.Equal(params[0], []byte("AUTH")):
-			return p.AUTH(client, params)
-		}
-		return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))
+
+```go
+//nsqd/protocol_v2.go:165
+func (p *protocolV2) Exec(client *clientV2, params [][]byte) ([]byte, error) {
+	...
+	switch {
+	case bytes.Equal(params[0], []byte("FIN")):
+		return p.FIN(client, params)
+	case bytes.Equal(params[0], []byte("RDY")):
+		return p.RDY(client, params)
+	case bytes.Equal(params[0], []byte("REQ")):
+		return p.REQ(client, params)
+	case bytes.Equal(params[0], []byte("PUB")):
+		return p.PUB(client, params)
+	case bytes.Equal(params[0], []byte("MPUB")):
+		return p.MPUB(client, params)
+	case bytes.Equal(params[0], []byte("DPUB")):
+		return p.DPUB(client, params)
+	case bytes.Equal(params[0], []byte("NOP")):
+		return p.NOP(client, params)
+	case bytes.Equal(params[0], []byte("TOUCH")):
+		return p.TOUCH(client, params)
+	case bytes.Equal(params[0], []byte("SUB")):
+		return p.SUB(client, params)
+	case bytes.Equal(params[0], []byte("CLS")):
+		return p.CLS(client, params)
+	case bytes.Equal(params[0], []byte("AUTH")):
+		return p.AUTH(client, params)
 	}
-	```
+	return nil, protocol.NewFatalClientErr(nil, "E_INVALID", fmt.Sprintf("invalid command %s", params[0]))
+}
+```
 
 > +  我们重点看下“PUB”时的运行过程。调用了p.pub(client, params)。从TCP中读到messageBody，然后处理后调用topic.PutMessage(msg)发送给topic。
 > +  topic.PutMessage（）首先对topic加一个锁，通过t.put(m)方法将消息m发送memoryMsgChan中，然后释放锁。如果memoryMsgChan满了，申请一个buff，把消息写到Backend，后期被backendMsgChan接收
