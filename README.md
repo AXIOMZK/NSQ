@@ -32,7 +32,7 @@
 
 # NSQ架构  
 
-![NSQ](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/NSQ.png)
+![NSQ](https://github.com/AXIOMZK/NSQ/raw/master/docs/NSQ.png)
 
 * ##  ***topic***  消息的逻辑关键词
   +  **```topic```** 是 **```NSQ```** 消息发布的 **```逻辑关键词```** ，可以理解为人为定义的一种消息类型。当程序初次发布带 **```topic```** 的消息时,如果 **```topic```** 不存在,则会在 ***```nsqd```*** 中创建。
@@ -63,7 +63,7 @@
 * ## 概述  
   1. NSQ推荐通过 ***```nsqd```*** 实例使用协同定位 ***producer*** ，这意味着即使面对网络分区，消息也会被保存在本地，直到它们被一个 ***consumer*** 读取。更重要的是， ***producer*** 不必去发现其他的 ***```nsqd```*** 节点，他们总是可以向本地 ***```nsqd```*** 实例发布消息。
   2. 一个 ***producer*** 向它的本地 ***```nsqd```*** 发送消息，要做到这点，首先要先打开一个连接( NSQ 提供 ```HTTP API``` 和 ```TCP 客户端``` 等2种方式连接到 ***```nsqd```*** )，然后发送一个包含 ***```topic```*** 和消息主体的发布命令(pub/mpub/publish)，在这种情况下，我们将消息发布到 ***```topic```*** 上，消息会采用多播的方式被拷贝到各个 ***```channel```*** 中, 然后通过多个 ***```channel```*** 以分散到我们不同需求的 ***consumer*** 中。  
-  ![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/nsqd/nsqd.gif)
+  ![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/docs/nsqd/nsqd.gif)
   3. ***```channel```*** 起到队列的作用。 多个 ***producer*** 产生的 ***```topic```*** 消息在每一个连接 ***```topic```*** 的 ***```channel```*** 上进行排队。
   4. 每个 ***```channel```*** 的消息都会进行排队，直到一个 ***```consumer```*** 把他们消费，如果此队列超出了内存限制，消息将会被写入到磁盘中。 ***```nsqd```*** 节点首先会向 ```nsqlookup``` 广播他们的位置信息，一旦它们注册成功， ***```consumer```*** 将会从 ```nsqlookup``` 服务器节点上发现所有包含事件 ***```topic```*** 的 ***```nsqd```*** 节点。
   5. 每个 ***```consumer```*** 向每个 ***```nsqd```*** 主机进行订阅操作，用于表明 ***```consumer```*** 已经准备好接受消息了。这里我们不需要一个完整的连通图，但我们必须要保证每个单独的 ***```nsqd```*** 实例拥有足够的消费者去消费它们的消息，否则 ***```channel```*** 会被队列堆着。
@@ -73,17 +73,17 @@
 
 
 * ##  ***```nsqd```*** 基本结构  
-![SVG](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/nsqd/SVG&WG.png)
+![SVG](https://github.com/AXIOMZK/NSQ/raw/master/docs/nsqd/SVG&WG.png)
 >  + 利用svc框架来启动服务, Run 时, 先后调用svc框架的 Init 和 Start 方法 ，然后开始不断监听退出的信号量, 最后调用 svc框架的Stop 方法来退出。
 >  + svc框架的Start方法从本地文件读取数据初始化topic和channel，然后调用功能入口Main方法。Main方法利用waitGroup框架来启动4个服务线程，至此启动完毕。
 >  + WaitGroup来自sync包，用于线程同步，单从字面意思理解，wait等待的意思，group组、团队的意思，WaitGroup就是等待一组服务执行完成后才会继续向下执行，涉及到WG个数的操作都使用原子操作来保证线程安全。  
   
 
 * ##   ***```nsqd```*** 详细流程图  
-![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/nsqd/nsqdflow.png)
+![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/docs/nsqd/nsqdflow.png)
    
 * ##  ***```nsqd```*** 源码概述  
-![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/nsqd/nsqd.png)
+![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/docs/nsqd/nsqd.png)
 > +  ***```nsqd```*** 服务开启时启动 ***``` TCP```*** 服务供客户端连接，启动 ***```HTTP```*** 服务，提供 ***```HTTP API```***    
   
 ```go
@@ -462,7 +462,7 @@ func consumer1(NSQDsAddrs []string) {
 
 **测试结果**
 
-![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/test/test1.png)
+![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/docs/test/test1.png)
 >  ```x,y,z``` 都被 ```consumer1``` 接收了。注意到接收时间， ```x,y``` 几乎同时被接收，它们都由 ```producer1``` 发布，而 ```z``` 由 ```producer2``` 发布，中间间隔10秒。测试了很多次都是10秒,偶尔是15秒或20秒。查看了ConnectToNSQDs()
 
 ```go
@@ -573,7 +573,7 @@ func consumer3(NSQDsAddrs []string) {
 
 **测试结果**
 
-![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/NSQ/docs/test/test2.png)
+![nsqd](https://github.com/AXIOMZK/NSQ/raw/master/docs/test/test2.png)
 > * ```consumer1``` 接收到了 ```y```
 > * ```consumer2``` 接收到了 ```x,z```
 > * ```consumer3``` 接收到了 ```x,y,z```
